@@ -1,5 +1,6 @@
 package com.mycompany.bp_5;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -12,6 +13,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Locale;
 import java.util.TimeZone;
+import javax.imageio.ImageIO;
 import org.bytedeco.javacpp.Loader;
 import static org.bytedeco.javacpp.helper.opencv_imgproc.cvDrawContours;
 import static org.bytedeco.javacpp.helper.opencv_imgproc.cvFindContours;
@@ -20,6 +22,7 @@ import org.bytedeco.javacpp.indexer.DoubleIndexer;
 import static org.bytedeco.javacpp.opencv_calib3d.cvRodrigues2;
 import org.bytedeco.javacpp.opencv_core;
 import static org.bytedeco.javacpp.opencv_core.IPL_DEPTH_8U;
+import org.bytedeco.javacpp.opencv_core.IplImage;
 import static org.bytedeco.javacpp.opencv_core.cvClearMemStorage;
 import static org.bytedeco.javacpp.opencv_core.cvGetSeqElem;
 import static org.bytedeco.javacpp.opencv_core.cvLoad;
@@ -44,6 +47,7 @@ import org.bytedeco.javacv.CanvasFrame;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
 import org.bytedeco.javacv.FrameRecorder;
+import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 
 
@@ -135,6 +139,8 @@ public class FaceDetection {
         Date dateActual = new Date();
         long dateLast = 0;
         String time;
+        BufferedImage templImage ;
+        BufferedImage faceImage;
         while (frame.isVisible() && (grabbedImage = converter.convert(grabber.grab())) != null) {
             cvClearMemStorage(storage);
 
@@ -146,9 +152,17 @@ public class FaceDetection {
             if(total != lastTotal && total != 0) {
                 dateActual = new Date();
                 long dA = dateActual.getTime();
-                if(dA - dateLast> 2000) {
+                if(dA - dateLast> 0) {
                 time = dateActual.toString();
-//                String[] timeA = time.split(" ");
+                
+                //do face photo
+                templImage = IplImageToBufferedImage(grabbedImage);
+                opencv_core.CvRect r = new opencv_core.CvRect(cvGetSeqElem(faces, 0));
+                int x = r.x(), y = r.y(), w = r.width(), h = r.height();
+                faceImage = templImage.getSubimage(x, y, w, h);
+                ImageIO.write(faceImage, "jpg", new File("foto/"+dA+".jpg"));
+                
+                
                 System.out.println("New face    time: "+ time);
                 }
                 dateLast =  dateActual.getTime();
@@ -166,5 +180,36 @@ public class FaceDetection {
         }
         frame.dispose();
         grabber.stop();
+    }
+    
+    
+    void saveImage(opencv_core.Mat input, String path) throws IOException {
+        OpenCVFrameConverter converter = new OpenCVFrameConverter.ToIplImage();
+        Frame frame = converter.convert(input);
+        opencv_core.IplImage iplImage = converter.convertToIplImage(frame);
+        BufferedImage out = IplImageToBufferedImage(iplImage);
+        ImageIO.write(out, "jpg",  new File(path+".jpg"));
+    } 
+    
+    IplImage MatToIplImage(opencv_core.Mat input) {
+        OpenCVFrameConverter converter = new OpenCVFrameConverter.ToIplImage();
+        Frame frame = converter.convert(input);
+        IplImage iplImage = converter.convertToIplImage(frame);
+        return iplImage;
+    }
+    
+    BufferedImage MatToBufferedImage(opencv_core.Mat mat) {
+        OpenCVFrameConverter converter = new OpenCVFrameConverter.ToIplImage();
+        Frame frame = converter.convert(mat);
+        opencv_core.IplImage iplImage = converter.convertToIplImage(frame);
+        BufferedImage out = IplImageToBufferedImage(iplImage);
+        return out;
+    }
+
+    public static BufferedImage IplImageToBufferedImage(opencv_core.IplImage src) {
+        OpenCVFrameConverter.ToIplImage grabberConverter = new OpenCVFrameConverter.ToIplImage();
+        Java2DFrameConverter paintConverter = new Java2DFrameConverter();
+        Frame frame = grabberConverter.convert(src);
+        return paintConverter.getBufferedImage(frame,1);
     }
 }
